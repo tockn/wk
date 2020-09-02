@@ -65,7 +65,3 @@ func parseTimeFlag(s string) (time.Time, error) {
 	}
 	return time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location()), nil
 }
-
-/*
-2020-09-01,9:30,14:50
-*/
