@@ -19,9 +19,16 @@ var startCommand = &cli.Command{
 
 var startFlags = []cli.Flag{
 	&cli.StringFlag{
-		Name:  "time",
-		Value: "",
-		Usage: "勤務開始時間",
+		Name:    "time",
+		Aliases: []string{"t"},
+		Value:   "",
+		Usage:   "勤務開始時間",
+	},
+	&cli.StringFlag{
+		Name:    "project",
+		Aliases: []string{"p"},
+		Value:   "default",
+		Usage:   "project name",
 	},
 }
 
@@ -36,7 +43,8 @@ func startWorking(c *cli.Context) error {
 			return err
 		}
 	}
-	return store.SaveStartedAt(t)
+	p := c.String("project")
+	return hStore.SaveStartedAt(p, time.Now(), t)
 }
 
 var ErrInvalidTimeFormat = fmt.Errorf("時間指定のフォーマットが不正です")

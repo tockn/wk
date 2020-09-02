@@ -3,6 +3,9 @@ package main
 import (
 	"log"
 	"os"
+	"path/filepath"
+
+	"github.com/mitchellh/go-homedir"
 
 	"github.com/urfave/cli/v2"
 )
@@ -19,21 +22,22 @@ func run() error {
 		Usage:    "超素朴打刻ツール",
 		Commands: commands,
 	}
+	home, err := homedir.Dir()
+	if err != nil {
+		return err
+	}
+
+	hStore, err = NewHistoryStore(filepath.Join(home, ".wk"))
+	if err != nil {
+		return err
+	}
 	return app.Run(os.Args)
 }
 
-var store HistoryStore
+var hStore HistoryStore
+var pStore ProjectStore
 
 var commands = []*cli.Command{
 	startCommand,
-	{
-		Name:    "finish",
-		Aliases: []string{"f"},
-		Usage:   "仕事おわり",
-		Action:  finishWorking,
-	},
-}
-
-func finishWorking(c *cli.Context) error {
-	return nil
+	finishCommand,
 }

@@ -1,6 +1,6 @@
 package main
 
 type ProjectStore interface {
-	Current() string
-	Set() string
+	Current() (string, error)
+	Set() (string, error)
 }
