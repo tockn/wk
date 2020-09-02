@@ -35,7 +35,6 @@ func run() error {
 }
 
 var hStore HistoryStore
-var pStore ProjectStore
 
 var commands = []*cli.Command{
 	startCommand,
