@@ -76,6 +76,8 @@ var fileFormat = "wk-%s.csv"
 
 func (s *historyStore) writeCSV() error {
 	for p, h := range s.histories {
+		path := filepath.Join(s.dir, fmt.Sprintf(fileFormat, p))
+		os.Remove(path)
 		f, err := os.OpenFile(filepath.Join(s.dir, fmt.Sprintf(fileFormat, p)), os.O_WRONLY|os.O_CREATE, 0755)
 		if err != nil {
 			return err
@@ -118,6 +120,9 @@ func (s *historyStore) init() error {
 
 		for i, h := range hs {
 			if i == 0 {
+				continue
+			}
+			if h == "" {
 				continue
 			}
 			sp := strings.Split(h, ",")
