@@ -64,6 +64,9 @@ func (s *historyStore) SaveFinishedAt(projectName string, date, finishedAt time.
 		s.histories[projectName] = make(History, 0)
 		c = s.histories[projectName]
 	}
+	if date.Hour() < 6 {
+		date = date.Add(-time.Hour * 24)
+	}
 	c[GetHistoryKey(date)] = WorkingTime{
 		StartedAt:  c[GetHistoryKey(date)].StartedAt,
 		FinishedAt: timeToPtr(finishedAt),
