@@ -10,68 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_historyStore_SaveFinishedAt(t *testing.T) {
-	type fields struct {
-		histories map[string]History
-		dir       string
-	}
-	type args struct {
-		projectName string
-		date        time.Time
-		finishedAt  time.Time
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &historyStore{
-				histories: tt.fields.histories,
-				dir:       tt.fields.dir,
-			}
-			if err := s.SaveFinishedAt(tt.args.projectName, tt.args.date, tt.args.finishedAt); (err != nil) != tt.wantErr {
-				t.Errorf("SaveFinishedAt() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_historyStore_SaveStartedAt(t *testing.T) {
-	type fields struct {
-		histories map[string]History
-		dir       string
-	}
-	type args struct {
-		projectName string
-		date        time.Time
-		startedAt   time.Time
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &historyStore{
-				histories: tt.fields.histories,
-				dir:       tt.fields.dir,
-			}
-			if err := s.SaveStartedAt(tt.args.projectName, tt.args.date, tt.args.startedAt); (err != nil) != tt.wantErr {
-				t.Errorf("SaveStartedAt() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
 var st = timeToPtr(time.Date(2020, 9, 1, 22, 0, 0, 0, time.UTC))
 var fi = timeToPtr(time.Date(2020, 9, 1, 23, 0, 0, 0, time.UTC))
 var p = "test"
@@ -156,20 +94,20 @@ func getCSV(project string) ([]byte, error) {
 }
 
 func expectCSV1() []byte {
-	return []byte(`date,started_at,finished_at`)
+	return []byte(`date,started_at,finished_at,rest_min`)
 }
 
 func expectCSV2() []byte {
-	return []byte(`date,started_at,finished_at
+	return []byte(`date,started_at,finished_at,rest_min
 2020-09-01,22:00:00,`)
 }
 
 func expectCSV3() []byte {
-	return []byte(`date,started_at,finished_at
-2020-09-01,,23:00:00`)
+	return []byte(`date,started_at,finished_at,rest_min
+2020-09-01,,23:00:00,`)
 }
 
 func expectCSV4() []byte {
-	return []byte(`date,started_at,finished_at
-2020-09-01,22:00:00,23:00:00`)
+	return []byte(`date,started_at,finished_at,rest_min
+2020-09-01,22:00:00,23:00:00,`)
 }

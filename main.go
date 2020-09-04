@@ -39,4 +39,5 @@ var hStore HistoryStore
 var commands = []*cli.Command{
 	startCommand,
 	finishCommand,
+	restCommand,
 }

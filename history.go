@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -12,6 +14,7 @@ import (
 type HistoryStore interface {
 	SaveStartedAt(projectName string, date, startedAt time.Time) error
 	SaveFinishedAt(projectName string, date, finishedAt time.Time) error
+	SaveRestMin(projectName string, date time.Time, min int64) error
 }
 
 func timeToPtr(t time.Time) *time.Time {
@@ -21,12 +24,16 @@ func timeToPtr(t time.Time) *time.Time {
 type WorkingTime struct {
 	StartedAt  *time.Time
 	FinishedAt *time.Time
+	RestMin    int64
 }
 
 type History map[HistoryKey]WorkingTime
 type HistoryKey string
 
 func GetHistoryKey(t time.Time) HistoryKey {
+	if t.Hour() < 6 {
+		t = t.Add(-time.Hour * 24)
+	}
 	return HistoryKey(fmt.Sprintf("%d-%d-%d", t.Year(), t.Month(), t.Day()))
 }
 
@@ -50,10 +57,9 @@ func (s *historyStore) SaveStartedAt(projectName string, date, startedAt time.Ti
 		s.histories[projectName] = make(History, 0)
 		c = s.histories[projectName]
 	}
-	c[GetHistoryKey(date)] = WorkingTime{
-		StartedAt:  timeToPtr(startedAt),
-		FinishedAt: c[GetHistoryKey(date)].FinishedAt,
-	}
+	h := c[GetHistoryKey(date)]
+	h.StartedAt = timeToPtr(startedAt)
+	c[GetHistoryKey(date)] = h
 	s.histories[projectName] = c
 	return s.writeCSV()
 }
@@ -64,13 +70,9 @@ func (s *historyStore) SaveFinishedAt(projectName string, date, finishedAt time.
 		s.histories[projectName] = make(History, 0)
 		c = s.histories[projectName]
 	}
-	if date.Hour() < 6 {
-		date = date.Add(-time.Hour * 24)
-	}
-	c[GetHistoryKey(date)] = WorkingTime{
-		StartedAt:  c[GetHistoryKey(date)].StartedAt,
-		FinishedAt: timeToPtr(finishedAt),
-	}
+	h := c[GetHistoryKey(date)]
+	h.FinishedAt = timeToPtr(finishedAt)
+	c[GetHistoryKey(date)] = h
 	s.histories[projectName] = c
 	return s.writeCSV()
 }
@@ -85,8 +87,25 @@ func (s *historyStore) writeCSV() error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprint(f, "date,started_at,finished_at")
-		for k, w := range h {
+		fmt.Fprint(f, "date,started_at,finished_at,rest_min")
+
+		ks := make([]HistoryKey, 0, len(h))
+		for k := range h {
+			ks = append(ks, k)
+		}
+		sort.Slice(ks, func(i, j int) bool {
+			var in, jn int
+			for _, b := range []byte(ks[i]) {
+				in += int(b)
+			}
+			for _, b := range []byte(ks[j]) {
+				jn += int(b)
+			}
+			return in < jn
+		})
+
+		for _, k := range ks {
+			w := h[k]
 			var st, fi string
 			if w.StartedAt != nil {
 				st = w.StartedAt.Format(timeFormat)
@@ -94,11 +113,23 @@ func (s *historyStore) writeCSV() error {
 			if w.FinishedAt != nil {
 				fi = w.FinishedAt.Format(timeFormat)
 			}
-			fmt.Fprintf(f, "\n%s,%s,%s", k, st, fi)
+			fmt.Fprintf(f, "\n%s,%s,%s,%d", k, st, fi, w.RestMin)
 		}
 		f.Close()
 	}
 	return nil
+}
+
+func (s *historyStore) SaveRestMin(projectName string, date time.Time, min int64) error {
+	c, ok := s.histories[projectName]
+	if !ok {
+		s.histories[projectName] = make(History, 0)
+		c = s.histories[projectName]
+	}
+	h := c[GetHistoryKey(date)]
+	h.RestMin = min
+	c[GetHistoryKey(date)] = h
+	return s.writeCSV()
 }
 
 var timeFormat = "15:04:05"
@@ -136,7 +167,7 @@ func (s *historyStore) init() error {
 				continue
 			}
 			sp := strings.Split(h, ",")
-			if len(sp) != 3 {
+			if len(sp) != 4 {
 				return fmt.Errorf("invalid format %s: %s", project, h)
 			}
 
@@ -154,9 +185,18 @@ func (s *historyStore) init() error {
 					return err
 				}
 			}
+
+			var rest int64
+			if sp[3] != "" {
+				rest, err = strconv.ParseInt(sp[3], 10, 64)
+				if err != nil {
+					return err
+				}
+			}
 			s.histories[project][HistoryKey(sp[0])] = WorkingTime{
 				StartedAt:  &st,
 				FinishedAt: &fi,
+				RestMin:    rest,
 			}
 		}
 	}
