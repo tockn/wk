@@ -101,8 +101,10 @@ func (s *historyStore) writeCSV() error {
 var timeFormat = "15:04:05"
 
 func (s *historyStore) init() error {
-	if err := os.Mkdir(s.dir, 0755); err != nil {
-		return err
+	if _, err := os.Stat(s.dir); os.IsNotExist(err) {
+		if err := os.Mkdir(s.dir, 0755); err != nil {
+			return err
+		}
 	}
 
 	fs, err := ioutil.ReadDir(s.dir)
