@@ -52,7 +52,7 @@ var ErrInvalidTimeFormat = fmt.Errorf("時間指定のフォーマットが不�
 func parseTimeFlag(s string) (time.Time, error) {
 	now := time.Now()
 	ss := strings.Split(s, ":")
-	if len(ss) != 2 {
+	if len(ss) < 2 {
 		return now, ErrInvalidTimeFormat
 	}
 	hour, err := strconv.Atoi(ss[0])
@@ -63,5 +63,13 @@ func parseTimeFlag(s string) (time.Time, error) {
 	if err != nil {
 		return now, ErrInvalidTimeFormat
 	}
-	return time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location()), nil
+	sec := 0
+	if len(ss) > 2 {
+		sec, err = strconv.Atoi(ss[2])
+		if err != nil {
+			return now, err
+		}
+
+	}
+	return time.Date(now.Year(), now.Month(), now.Day(), hour, min, sec, 0, now.Location()), nil
 }
