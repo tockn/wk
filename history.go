@@ -126,6 +126,7 @@ func (s *historyStore) init() error {
 
 		for i, h := range hs {
 			if i == 0 {
+				s.histories[project] = make(History, 0)
 				continue
 			}
 			if h == "" {
@@ -150,7 +151,6 @@ func (s *historyStore) init() error {
 					return err
 				}
 			}
-			s.histories[project] = make(History, 0)
 			s.histories[project][HistoryKey(sp[0])] = WorkingTime{
 				StartedAt:  &st,
 				FinishedAt: &fi,
