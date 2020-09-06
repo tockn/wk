@@ -15,6 +15,7 @@ type HistoryStore interface {
 	SaveStartedAt(projectName string, date, startedAt time.Time) error
 	SaveFinishedAt(projectName string, date, finishedAt time.Time) error
 	SaveRestMin(projectName string, date time.Time, min int64) error
+	FindHistory(projectName string) (History, error)
 }
 
 func timeToPtr(t time.Time) *time.Time {
@@ -201,4 +202,8 @@ func (s *historyStore) init() error {
 		}
 	}
 	return nil
+}
+
+func (s *historyStore) FindHistory(projectName string) (History, error) {
+	return s.histories[projectName], nil
 }

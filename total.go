@@ -1,0 +1,49 @@
+package main
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/urfave/cli/v2"
+)
+
+var totalCommand = &cli.Command{
+	Name:    "total",
+	Aliases: []string{"t"},
+	Usage:   "合計勤務時間（h）",
+	Action:  totalWorkingTime,
+	Flags:   totalFlags,
+}
+
+var totalFlags = []cli.Flag{
+	&cli.StringFlag{
+		Name:    "project",
+		Aliases: []string{"p"},
+		Value:   "default",
+		Usage:   "project name",
+	},
+}
+
+func totalWorkingTime(c *cli.Context) error {
+	p := c.String("project")
+	h, err := hStore.FindHistory(p)
+	if err != nil {
+		return err
+	}
+	total := 0.0
+	for k, w := range h {
+		st := *w.StartedAt
+		fi := *w.FinishedAt
+		if w.StartedAt.Hour() < 6 {
+			st = w.StartedAt.Add(time.Hour * 24)
+		}
+		if w.FinishedAt.Hour() < 6 {
+			fi = w.FinishedAt.Add(time.Hour * 24)
+		}
+		total += float64(fi.Unix()-st.Unix()) / 60 / 60
+		total -= float64(w.RestMin) / 60
+		fmt.Printf("%s: %.2f\n", k, float64(fi.Unix()-st.Unix())/60/60-float64(w.RestMin)/60)
+	}
+	fmt.Printf("Total Working Time: %.2f\n", total)
+	return nil
+}

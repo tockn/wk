@@ -40,4 +40,5 @@ var commands = []*cli.Command{
 	startCommand,
 	finishCommand,
 	restCommand,
+	totalCommand,
 }
