@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/urfave/cli/v2"
@@ -25,13 +26,23 @@ var totalFlags = []cli.Flag{
 }
 
 func totalWorkingTime(c *cli.Context) error {
+	unitStr := c.Args().Get(0)
+	unit := 1.0
+	if unitStr != "" {
+		var err error
+		unit, err = strconv.ParseFloat(unitStr, 10)
+		if err != nil {
+			return err
+		}
+	}
 	p := c.String("project")
 	h, err := hStore.FindHistory(p)
 	if err != nil {
 		return err
 	}
 	total := 0.0
-	for k, w := range h {
+	for _, k := range h.SortedKey() {
+		w := h[k]
 		st := *w.StartedAt
 		fi := *w.FinishedAt
 		if w.StartedAt.Hour() < 6 {
@@ -45,5 +56,8 @@ func totalWorkingTime(c *cli.Context) error {
 		fmt.Printf("%s: %.2f\n", k, float64(fi.Unix()-st.Unix())/60/60-float64(w.RestMin)/60)
 	}
 	fmt.Printf("Total Working Time: %.2f\n", total)
+	if unit != 1 {
+		fmt.Printf("Salary: %.2f\n", total*unit)
+	}
 	return nil
 }

@@ -35,5 +35,5 @@ func rest(c *cli.Context) error {
 		return err
 	}
 	p := c.String("project")
-	return hStore.SaveRestMin(p, time.Now(), rest)
+	return hStore.IncrementRestMin(p, time.Now(), rest)
 }

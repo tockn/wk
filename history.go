@@ -14,7 +14,7 @@ import (
 type HistoryStore interface {
 	SaveStartedAt(projectName string, date, startedAt time.Time) error
 	SaveFinishedAt(projectName string, date, finishedAt time.Time) error
-	SaveRestMin(projectName string, date time.Time, min int64) error
+	IncrementRestMin(projectName string, date time.Time, min int64) error
 	FindHistory(projectName string) (History, error)
 }
 
@@ -29,6 +29,25 @@ type WorkingTime struct {
 }
 
 type History map[HistoryKey]WorkingTime
+
+func (h History) SortedKey() []HistoryKey {
+	ks := make([]HistoryKey, 0, len(h))
+	for k := range h {
+		ks = append(ks, k)
+	}
+	sort.Slice(ks, func(i, j int) bool {
+		var in, jn int
+		for _, b := range []byte(ks[i]) {
+			in += int(b)
+		}
+		for _, b := range []byte(ks[j]) {
+			jn += int(b)
+		}
+		return in < jn
+	})
+	return ks
+}
+
 type HistoryKey string
 
 func GetHistoryKey(t time.Time) HistoryKey {
@@ -90,22 +109,7 @@ func (s *historyStore) writeCSV() error {
 		}
 		fmt.Fprint(f, "date,started_at,finished_at,rest_min")
 
-		ks := make([]HistoryKey, 0, len(h))
-		for k := range h {
-			ks = append(ks, k)
-		}
-		sort.Slice(ks, func(i, j int) bool {
-			var in, jn int
-			for _, b := range []byte(ks[i]) {
-				in += int(b)
-			}
-			for _, b := range []byte(ks[j]) {
-				jn += int(b)
-			}
-			return in < jn
-		})
-
-		for _, k := range ks {
+		for _, k := range h.SortedKey() {
 			w := h[k]
 			var st, fi string
 			if w.StartedAt != nil {
@@ -121,14 +125,14 @@ func (s *historyStore) writeCSV() error {
 	return nil
 }
 
-func (s *historyStore) SaveRestMin(projectName string, date time.Time, min int64) error {
+func (s *historyStore) IncrementRestMin(projectName string, date time.Time, min int64) error {
 	c, ok := s.histories[projectName]
 	if !ok {
 		s.histories[projectName] = make(History, 0)
 		c = s.histories[projectName]
 	}
 	h := c[GetHistoryKey(date)]
-	h.RestMin = min
+	h.RestMin += min
 	c[GetHistoryKey(date)] = h
 	return s.writeCSV()
 }
