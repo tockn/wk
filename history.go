@@ -56,7 +56,23 @@ func (h History) SortedKey() []HistoryKey {
 	return ks
 }
 
+func (h History) YearMonthKeys() map[string][]HistoryKey {
+	hs := make(map[string][]HistoryKey, 0)
+	for _, k := range h.SortedKey() {
+		if _, ok := hs[k.YearMonthKey()]; !ok {
+			hs[k.YearMonthKey()] = make([]HistoryKey, 0)
+		}
+		hs[k.YearMonthKey()] = append(hs[k.YearMonthKey()], k)
+	}
+	return hs
+}
+
 type HistoryKey string
+
+func (k HistoryKey) YearMonthKey() string {
+	sp := strings.Split(string(k), "-")
+	return strings.Join(sp[:2], "-")
+}
 
 func GetHistoryKey(t time.Time) HistoryKey {
 	if t.Hour() < 6 {
@@ -78,6 +94,8 @@ type historyStore struct {
 	histories map[string]History
 	dir       string
 }
+
+// ~/.wk/project_name/
 
 func (s *historyStore) SaveStartedAt(projectName string, date, startedAt time.Time) error {
 	c, ok := s.histories[projectName]
@@ -109,26 +127,31 @@ var fileFormat = "wk-%s.csv"
 
 func (s *historyStore) writeCSV() error {
 	for p, h := range s.histories {
-		path := filepath.Join(s.dir, fmt.Sprintf(fileFormat, p))
-		os.Remove(path)
-		f, err := os.OpenFile(filepath.Join(s.dir, fmt.Sprintf(fileFormat, p)), os.O_WRONLY|os.O_CREATE, 0755)
-		if err != nil {
-			return err
-		}
-		fmt.Fprint(f, "date,started_at,finished_at,rest_min")
-
-		for _, k := range h.SortedKey() {
-			w := h[k]
-			var st, fi string
-			if w.StartedAt != nil {
-				st = w.StartedAt.Format(timeFormat)
+		for ym, ks := range h.YearMonthKeys() {
+			dir := filepath.Join(s.dir, p)
+			if _, err := os.Stat(dir); os.IsNotExist(err) {
+				os.Mkdir(dir, 0755)
 			}
-			if w.FinishedAt != nil {
-				fi = w.FinishedAt.Format(timeFormat)
+			path := filepath.Join(dir, fmt.Sprintf(fileFormat, ym))
+			os.Remove(path)
+			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0755)
+			if err != nil {
+				return err
 			}
-			fmt.Fprintf(f, "\n%s,%s,%s,%d", k, st, fi, w.RestMin)
+			fmt.Fprint(f, "date,started_at,finished_at,rest_min")
+			for _, k := range ks {
+				w := h[k]
+				var st, fi string
+				if w.StartedAt != nil {
+					st = w.StartedAt.Format(timeFormat)
+				}
+				if w.FinishedAt != nil {
+					fi = w.FinishedAt.Format(timeFormat)
+				}
+				fmt.Fprintf(f, "\n%s,%s,%s,%d", k, st, fi, w.RestMin)
+			}
+			f.Close()
 		}
-		f.Close()
 	}
 	return nil
 }
@@ -154,62 +177,70 @@ func (s *historyStore) init() error {
 		}
 	}
 
-	fs, err := ioutil.ReadDir(s.dir)
+	ds, err := ioutil.ReadDir(s.dir)
 	if err != nil {
 		return err
 	}
-	for _, info := range fs {
-		f, err := os.OpenFile(filepath.Join(s.dir, info.Name()), os.O_RDONLY, 0755)
+	for _, d := range ds {
+		if !d.IsDir() {
+			continue
+		}
+		fs, err := ioutil.ReadDir(filepath.Join(s.dir, d.Name()))
 		if err != nil {
 			return err
 		}
-		bs, err := ioutil.ReadAll(f)
-		if err != nil {
-			return err
-		}
-
-		project := strings.Split(strings.Split(info.Name(), "-")[1], ".")[0]
-		hs := strings.Split(string(bs), "\n")
-
-		for i, h := range hs {
-			if i == 0 {
-				s.histories[project] = make(History, 0)
-				continue
+		for _, info := range fs {
+			f, err := os.OpenFile(filepath.Join(s.dir, d.Name(), info.Name()), os.O_RDONLY, 0755)
+			if err != nil {
+				return err
 			}
-			if h == "" {
-				continue
-			}
-			sp := strings.Split(h, ",")
-			if len(sp) != 4 {
-				return fmt.Errorf("invalid format %s: %s", project, h)
+			bs, err := ioutil.ReadAll(f)
+			if err != nil {
+				return err
 			}
 
-			var st, fi time.Time
-			if sp[1] != "" {
-				st, err = time.Parse(timeFormat, sp[1])
-				if err != nil {
-					return err
+			project := d.Name()
+			hs := strings.Split(string(bs), "\n")
+
+			for i, h := range hs {
+				if i == 0 || h == "" {
+					continue
 				}
-			}
-
-			if sp[2] != "" {
-				fi, err = time.Parse(timeFormat, sp[2])
-				if err != nil {
-					return err
+				if _, ok := s.histories[project]; !ok {
+					s.histories[project] = make(History, 0)
 				}
-			}
-
-			var rest int64
-			if sp[3] != "" {
-				rest, err = strconv.ParseInt(sp[3], 10, 64)
-				if err != nil {
-					return err
+				sp := strings.Split(h, ",")
+				if len(sp) != 4 {
+					return fmt.Errorf("invalid format %s: %s", project, h)
 				}
-			}
-			s.histories[project][HistoryKey(sp[0])] = WorkingTime{
-				StartedAt:  &st,
-				FinishedAt: &fi,
-				RestMin:    rest,
+
+				var st, fi time.Time
+				if sp[1] != "" {
+					st, err = time.Parse(timeFormat, sp[1])
+					if err != nil {
+						return err
+					}
+				}
+
+				if sp[2] != "" {
+					fi, err = time.Parse(timeFormat, sp[2])
+					if err != nil {
+						return err
+					}
+				}
+
+				var rest int64
+				if sp[3] != "" {
+					rest, err = strconv.ParseInt(sp[3], 10, 64)
+					if err != nil {
+						return err
+					}
+				}
+				s.histories[project][HistoryKey(sp[0])] = WorkingTime{
+					StartedAt:  &st,
+					FinishedAt: &fi,
+					RestMin:    rest,
+				}
 			}
 		}
 	}
