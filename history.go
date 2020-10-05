@@ -36,22 +36,28 @@ func (h History) SortedKey() []HistoryKey {
 		ks = append(ks, k)
 	}
 	sort.Slice(ks, func(i, j int) bool {
-		var in, jn int
-		for _, s := range strings.Split(string(ks[i]), "-") {
+		ins := make([]int, 3)
+		jns := make([]int, 3)
+		for i, s := range strings.Split(string(ks[i]), "-") {
 			n, err := strconv.Atoi(s)
 			if err != nil {
 				continue
 			}
-			in += n
+			ins[i] = n
 		}
-		for _, s := range strings.Split(string(ks[j]), "-") {
+		for i, s := range strings.Split(string(ks[j]), "-") {
 			n, err := strconv.Atoi(s)
 			if err != nil {
 				continue
 			}
-			jn += n
+			jns[i] = n
 		}
-		return in < jn
+		for i := 0; i < 3; i++ {
+			if ins[i] != jns[i] {
+				return ins[i] < jns[i]
+			}
+		}
+		return false
 	})
 	return ks
 }
