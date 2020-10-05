@@ -133,11 +133,14 @@ var fileFormat = "wk-%s.csv"
 
 func (s *historyStore) writeCSV() error {
 	for p, h := range s.histories {
+		dir := filepath.Join(s.dir, p)
+		if err := os.RemoveAll(dir); err != nil {
+			return err
+		}
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
 		for ym, ks := range h.YearMonthKeys() {
-			dir := filepath.Join(s.dir, p)
-			if _, err := os.Stat(dir); os.IsNotExist(err) {
-				os.Mkdir(dir, 0755)
-			}
 			path := filepath.Join(dir, fmt.Sprintf(fileFormat, ym))
 			os.Remove(path)
 			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0755)
