@@ -23,6 +23,12 @@ var totalFlags = []cli.Flag{
 		Value:   "default",
 		Usage:   "project name",
 	},
+	&cli.StringFlag{
+		Name:    "month",
+		Aliases: []string{"m"},
+		Value:   "",
+		Usage:   "年月を指定（ex: 2020-9）",
+	},
 }
 
 func totalWorkingTime(c *cli.Context) error {
@@ -35,6 +41,7 @@ func totalWorkingTime(c *cli.Context) error {
 			return err
 		}
 	}
+	key := c.String("month")
 	p := c.String("project")
 	h, err := hStore.FindHistory(p)
 	if err != nil {
@@ -43,6 +50,9 @@ func totalWorkingTime(c *cli.Context) error {
 	total := 0.0
 	for _, k := range h.SortedKey() {
 		w := h[k]
+		if key != "" && k.YearMonthKey() != key {
+			continue
+		}
 		st := *w.StartedAt
 		fi := *w.FinishedAt
 		if w.StartedAt.Hour() < 6 {
