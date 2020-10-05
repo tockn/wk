@@ -8,7 +8,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type HistoryStore interface {
@@ -98,12 +101,13 @@ func NewHistoryStore(dir string) (HistoryStore, error) {
 type historyStore struct {
 	// k = projectName
 	histories map[string]History
+	mutex     sync.RWMutex
 	dir       string
 }
 
-// ~/.wk/project_name/
-
 func (s *historyStore) SaveStartedAt(projectName string, date, startedAt time.Time) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	c, ok := s.histories[projectName]
 	if !ok {
 		s.histories[projectName] = make(History, 0)
@@ -117,6 +121,8 @@ func (s *historyStore) SaveStartedAt(projectName string, date, startedAt time.Ti
 }
 
 func (s *historyStore) SaveFinishedAt(projectName string, date, finishedAt time.Time) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	c, ok := s.histories[projectName]
 	if !ok {
 		s.histories[projectName] = make(History, 0)
@@ -132,6 +138,9 @@ func (s *historyStore) SaveFinishedAt(projectName string, date, finishedAt time.
 var fileFormat = "wk-%s.csv"
 
 func (s *historyStore) writeCSV() error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	eg := errgroup.Group{}
 	for p, h := range s.histories {
 		dir := filepath.Join(s.dir, p)
 		if err := os.RemoveAll(dir); err != nil {
@@ -141,31 +150,36 @@ func (s *historyStore) writeCSV() error {
 			return err
 		}
 		for ym, ks := range h.YearMonthKeys() {
-			path := filepath.Join(dir, fmt.Sprintf(fileFormat, ym))
-			os.Remove(path)
-			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0755)
-			if err != nil {
-				return err
-			}
-			fmt.Fprint(f, "date,started_at,finished_at,rest_min")
-			for _, k := range ks {
-				w := h[k]
-				var st, fi string
-				if w.StartedAt != nil {
-					st = w.StartedAt.Format(timeFormat)
+			eg.Go(func() error {
+				path := filepath.Join(dir, fmt.Sprintf(fileFormat, ym))
+				os.Remove(path)
+				f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0755)
+				if err != nil {
+					return err
 				}
-				if w.FinishedAt != nil {
-					fi = w.FinishedAt.Format(timeFormat)
+				defer f.Close()
+				fmt.Fprint(f, "date,started_at,finished_at,rest_min")
+				for _, k := range ks {
+					w := h[k]
+					var st, fi string
+					if w.StartedAt != nil {
+						st = w.StartedAt.Format(timeFormat)
+					}
+					if w.FinishedAt != nil {
+						fi = w.FinishedAt.Format(timeFormat)
+					}
+					fmt.Fprintf(f, "\n%s,%s,%s,%d", k, st, fi, w.RestMin)
 				}
-				fmt.Fprintf(f, "\n%s,%s,%s,%d", k, st, fi, w.RestMin)
-			}
-			f.Close()
+				return nil
+			})
 		}
 	}
-	return nil
+	return eg.Wait()
 }
 
 func (s *historyStore) IncrementRestMin(projectName string, date time.Time, min int64) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	c, ok := s.histories[projectName]
 	if !ok {
 		s.histories[projectName] = make(History, 0)
@@ -180,6 +194,8 @@ func (s *historyStore) IncrementRestMin(projectName string, date time.Time, min 
 var timeFormat = "15:04:05"
 
 func (s *historyStore) init() error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	if _, err := os.Stat(s.dir); os.IsNotExist(err) {
 		if err := os.Mkdir(s.dir, 0755); err != nil {
 			return err
@@ -257,5 +273,7 @@ func (s *historyStore) init() error {
 }
 
 func (s *historyStore) FindHistory(projectName string) (History, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
 	return s.histories[projectName], nil
 }
