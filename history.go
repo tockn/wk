@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -101,13 +100,10 @@ func NewHistoryStore(dir string) (HistoryStore, error) {
 type historyStore struct {
 	// k = projectName
 	histories map[string]History
-	mutex     sync.RWMutex
 	dir       string
 }
 
 func (s *historyStore) SaveStartedAt(projectName string, date, startedAt time.Time) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 	c, ok := s.histories[projectName]
 	if !ok {
 		s.histories[projectName] = make(History, 0)
@@ -121,8 +117,6 @@ func (s *historyStore) SaveStartedAt(projectName string, date, startedAt time.Ti
 }
 
 func (s *historyStore) SaveFinishedAt(projectName string, date, finishedAt time.Time) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 	c, ok := s.histories[projectName]
 	if !ok {
 		s.histories[projectName] = make(History, 0)
@@ -138,8 +132,6 @@ func (s *historyStore) SaveFinishedAt(projectName string, date, finishedAt time.
 var fileFormat = "wk-%s.csv"
 
 func (s *historyStore) writeCSV() error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 	eg := errgroup.Group{}
 	for p, h := range s.histories {
 		dir := filepath.Join(s.dir, p)
@@ -178,8 +170,6 @@ func (s *historyStore) writeCSV() error {
 }
 
 func (s *historyStore) IncrementRestMin(projectName string, date time.Time, min int64) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 	c, ok := s.histories[projectName]
 	if !ok {
 		s.histories[projectName] = make(History, 0)
@@ -194,8 +184,6 @@ func (s *historyStore) IncrementRestMin(projectName string, date time.Time, min 
 var timeFormat = "15:04:05"
 
 func (s *historyStore) init() error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 	if _, err := os.Stat(s.dir); os.IsNotExist(err) {
 		if err := os.Mkdir(s.dir, 0755); err != nil {
 			return err
@@ -273,7 +261,5 @@ func (s *historyStore) init() error {
 }
 
 func (s *historyStore) FindHistory(projectName string) (History, error) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
 	return s.histories[projectName], nil
 }
