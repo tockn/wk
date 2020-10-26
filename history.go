@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 )
 
 type HistoryStore interface {
@@ -132,7 +130,6 @@ func (s *historyStore) SaveFinishedAt(projectName string, date, finishedAt time.
 var fileFormat = "wk-%s.csv"
 
 func (s *historyStore) writeCSV() error {
-	eg := errgroup.Group{}
 	for p, h := range s.histories {
 		dir := filepath.Join(s.dir, p)
 		if err := os.RemoveAll(dir); err != nil {
@@ -142,31 +139,29 @@ func (s *historyStore) writeCSV() error {
 			return err
 		}
 		for ym, ks := range h.YearMonthKeys() {
-			eg.Go(func() error {
-				path := filepath.Join(dir, fmt.Sprintf(fileFormat, ym))
-				os.Remove(path)
-				f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0755)
-				if err != nil {
-					return err
+			path := filepath.Join(dir, fmt.Sprintf(fileFormat, ym))
+			os.Remove(path)
+			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0755)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			fmt.Fprint(f, "date,started_at,finished_at,rest_min")
+			for _, k := range ks {
+				w := h[k]
+				var st, fi string
+				if w.StartedAt != nil {
+					st = w.StartedAt.Format(timeFormat)
 				}
-				defer f.Close()
-				fmt.Fprint(f, "date,started_at,finished_at,rest_min")
-				for _, k := range ks {
-					w := h[k]
-					var st, fi string
-					if w.StartedAt != nil {
-						st = w.StartedAt.Format(timeFormat)
-					}
-					if w.FinishedAt != nil {
-						fi = w.FinishedAt.Format(timeFormat)
-					}
-					fmt.Fprintf(f, "\n%s,%s,%s,%d", k, st, fi, w.RestMin)
+				if w.FinishedAt != nil {
+					fi = w.FinishedAt.Format(timeFormat)
 				}
-				return nil
-			})
+				fmt.Fprintf(f, "\n%s,%s,%s,%d", k, st, fi, w.RestMin)
+			}
+			return nil
 		}
 	}
-	return eg.Wait()
+	return nil
 }
 
 func (s *historyStore) IncrementRestMin(projectName string, date time.Time, min int64) error {
