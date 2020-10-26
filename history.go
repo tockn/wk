@@ -145,7 +145,6 @@ func (s *historyStore) writeCSV() error {
 			if err != nil {
 				return err
 			}
-			defer f.Close()
 			fmt.Fprint(f, "date,started_at,finished_at,rest_min")
 			for _, k := range ks {
 				w := h[k]
@@ -158,7 +157,7 @@ func (s *historyStore) writeCSV() error {
 				}
 				fmt.Fprintf(f, "\n%s,%s,%s,%d", k, st, fi, w.RestMin)
 			}
-			return nil
+			f.Close()
 		}
 	}
 	return nil
