@@ -27,7 +27,7 @@ var totalFlags = []cli.Flag{
 		Name:    "month",
 		Aliases: []string{"m"},
 		Value:   "",
-		Usage:   "年月を指定（ex: 2020-9）",
+		Usage:   "年月を指定。デフォルトは実行時の年月。totalを指定すると全期間を取得（ex: 2020-9）",
 	},
 }
 
@@ -42,6 +42,10 @@ func totalWorkingTime(c *cli.Context) error {
 		}
 	}
 	key := c.String("month")
+	if key == "" {
+		t := time.Now()
+		key = fmt.Sprintf("%d-%d", t.Year(), t.Month())
+	}
 	p := c.String("project")
 	h, err := hStore.FindHistory(p)
 	if err != nil {
@@ -50,7 +54,7 @@ func totalWorkingTime(c *cli.Context) error {
 	total := 0.0
 	for _, k := range h.SortedKey() {
 		w := h[k]
-		if key != "" && k.YearMonthKey() != key {
+		if key != "total" && k.YearMonthKey() != key {
 			continue
 		}
 		st := *w.StartedAt
