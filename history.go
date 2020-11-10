@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -160,7 +161,19 @@ func (s *historyStore) writeCSV() error {
 			f.Close()
 		}
 	}
-	return nil
+	return s.commit()
+}
+
+func (s *historyStore) commit() error {
+	cmd := exec.Command("git", "init")
+	cmd.Dir = s.dir
+	cmd.Run()
+	cmd = exec.Command("git", "add", ".")
+	cmd.Dir = s.dir
+	cmd.Run()
+	cmd = exec.Command("git", "commit", "-m", fmt.Sprintf("%d", time.Now().Unix()))
+	cmd.Dir = s.dir
+	return cmd.Run()
 }
 
 func (s *historyStore) IncrementRestMin(projectName string, date time.Time, min int64) error {
@@ -189,7 +202,7 @@ func (s *historyStore) init() error {
 		return err
 	}
 	for _, d := range ds {
-		if !d.IsDir() {
+		if !d.IsDir() || d.Name() == ".git" {
 			continue
 		}
 		fs, err := ioutil.ReadDir(filepath.Join(s.dir, d.Name()))
